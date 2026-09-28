@@ -1,0 +1,32 @@
+# было privileged: true. Заодно всё, что требует PodSecurity restricted и Gatekeeper.
+# nginx-unprivileged слушает 8080 и пишет только в /tmp — работает с readOnlyRootFilesystem
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-privileged-fixed
+  namespace: audit-zone
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: nginx
+      image: nginxinc/nginx-unprivileged:alpine
+      ports:
+        - containerPort: 8080
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop: ["ALL"]
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: tmp
+      emptyDir: {}

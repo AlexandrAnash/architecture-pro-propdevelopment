@@ -1,0 +1,29 @@
+# Аудит для audit-zone: кто и что пытался развернуть, и кто трогал политики.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages: ["RequestReceived"]
+rules:
+  # поды в audit-zone — с телом запроса, чтобы видеть securityContext
+  - level: RequestResponse
+    namespaces: ["audit-zone"]
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["pods"]
+  # изменения namespace (метки PodSecurity) и политик Gatekeeper
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["namespaces"]
+      - group: "templates.gatekeeper.sh"
+      - group: "constraints.gatekeeper.sh"
+      - group: "admissionregistration.k8s.io"
+  # секреты — только метаданные, без содержимого
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+  - level: None
+    verbs: ["get", "list", "watch"]
+  - level: Metadata
