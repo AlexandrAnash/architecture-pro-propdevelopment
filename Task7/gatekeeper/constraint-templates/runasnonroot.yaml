@@ -1,0 +1,46 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8spsprunasnonroot
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sPSPRunAsNonRoot
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8spsprunasnonroot
+
+        # runAsNonRoot: true на уровне контейнера или пода
+        violation[{"msg": msg}] {
+          c := input_containers[_]
+          not run_as_non_root(c)
+          msg := sprintf("нужен runAsNonRoot: true: %v", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          c := input_containers[_]
+          c.securityContext.runAsUser == 0
+          msg := sprintf("запуск от UID 0 запрещён: %v", [c.name])
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.spec.securityContext.runAsUser == 0
+          msg := "запуск пода от UID 0 запрещён"
+        }
+
+        violation[{"msg": msg}] {
+          c := input_containers[_]
+          not c.securityContext.readOnlyRootFilesystem
+          msg := sprintf("нужен readOnlyRootFilesystem: true: %v", [c.name])
+        }
+
+        run_as_non_root(c) { c.securityContext.runAsNonRoot == true }
+        run_as_non_root(c) {
+          not c.securityContext.runAsNonRoot == false
+          input.review.object.spec.securityContext.runAsNonRoot == true
+        }
+
+        input_containers[c] { c := input.review.object.spec.containers[_] }
+        input_containers[c] { c := input.review.object.spec.initContainers[_] }
